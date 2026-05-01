@@ -4,14 +4,13 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from tools import search_web, scrape_url
 from dotenv import load_dotenv
-import time
 
 load_dotenv()
 
 # Initialize the Google Gemini model with better free tier support
 # Use max_retries=1 to fail fast on quota errors
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite",  
+    model="gemini-2.5-flash-lite",  # Use more stable older model
     temperature=0.3,
     max_retries=1,  # Fail fast on quota errors
     timeout=20
@@ -40,7 +39,7 @@ Format each scraped result as: "Source: [URL]\n[Content]"
 
 def build_reader_agent():
     return agents.create_agent(
-        model=llm, 
+        model=llm,
         tools=[scrape_url],
         system_prompt=reader_system_prompt
     )

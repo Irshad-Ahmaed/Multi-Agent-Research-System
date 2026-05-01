@@ -1,5 +1,5 @@
 from agents import build_search_agent, build_reader_agent, writer_chain, critic_chain
-from langchain.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 
 def run_research_pipeline(topic: str) -> dict:
     state = {}
@@ -16,7 +16,8 @@ def run_research_pipeline(topic: str) -> dict:
         ]
     })
 
-    state['search_results'] = search_result['messages'][-1].content
+    tool_outputs = [m.content if isinstance(m.content, str) else str(m.content) for m in search_result['messages'] if isinstance(m, ToolMessage)]
+    state['search_results'] = "\n\n".join(tool_outputs) or str(search_result['messages'][-1].content)
 
     print("\n Search Results:")
     print(state['search_results'])

@@ -1,7 +1,8 @@
+import html
 import streamlit as st
 import time
 from agents import build_reader_agent, build_search_agent, writer_chain, critic_chain
-from langchain.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 from google.genai.errors import ClientError
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -418,7 +419,8 @@ if st.session_state.running and not st.session_state.done:
                 sr = search_agent.invoke({
                     "messages": [HumanMessage(f"Find recent, reliable and detailed information about: {topic_val}")]
                 })
-                results["search"] = sr["messages"][-1].content
+                tool_outputs = [m.content if isinstance(m.content, str) else str(m.content) for m in sr["messages"] if isinstance(m, ToolMessage)]
+                results["search"] = "\n\n".join(tool_outputs) or str(sr["messages"][-1].content)
                 st.session_state.results = dict(results)
             except ClientError as e:
                 st.error(f"❌ Search Agent Error: Free tier quota exceeded. Wait 24 hours or upgrade at https://ai.google.dev/")
@@ -428,7 +430,7 @@ if st.session_state.running and not st.session_state.done:
 
         # ── Step 2: Reader ──
         with st.spinner("📄  Reader Agent is scraping top resources…"):
-            time.sleep(2)  # Rate limiting
+            time.sleep(4)  # Rate limiting
             try:
                 reader_agent = build_reader_agent()
                 rr = reader_agent.invoke({
@@ -440,7 +442,8 @@ if st.session_state.running and not st.session_state.done:
                         f"Search Results:\n{results['search']}"
                     )]
                 })
-                results["reader"] = rr["messages"][-1].content
+                reader_tool_outputs = [m.content if isinstance(m.content, str) else str(m.content) for m in rr["messages"] if isinstance(m, ToolMessage)]
+                results["reader"] = "\n\n".join(reader_tool_outputs) or str(rr["messages"][-1].content)
                 st.session_state.results = dict(results)
             except ClientError as e:
                 st.warning(f"⚠️  Reader Agent Warning: {str(e)}. Using search results instead.")
@@ -449,7 +452,7 @@ if st.session_state.running and not st.session_state.done:
 
         # ── Step 3: Writer ──
         with st.spinner("✍️  Writer is drafting the report…"):
-            time.sleep(2)  # Rate limiting
+            time.sleep(4)  # Rate limiting
             try:
                 research_combined = (
                     f"SEARCH RESULTS:\n{results['search']}\n\n"
@@ -468,7 +471,7 @@ if st.session_state.running and not st.session_state.done:
 
         # ── Step 4: Critic ──
         with st.spinner("🧐  Critic is reviewing the report…"):
-            time.sleep(2)  # Rate limiting
+            time.sleep(4)  # Rate limiting
             try:
                 results["critic"] = critic_chain.invoke({
                     "report": results["writer"]
@@ -500,12 +503,12 @@ if r:
     if "search" in r:
         with st.expander("🔍 Search Results (raw)", expanded=False):
             st.markdown(f'<div class="result-panel"><div class="result-panel-title">Search Agent Output</div>'
-                        f'<div class="result-content">{r["search"]}</div></div>', unsafe_allow_html=True)
+                        f'<div class="result-content">{html.escape(r["search"])}</div></div>', unsafe_allow_html=True)
 
     if "reader" in r:
         with st.expander("📄 Scraped Content (raw)", expanded=False):
             st.markdown(f'<div class="result-panel"><div class="result-panel-title">Reader Agent Output</div>'
-                        f'<div class="result-content">{r["reader"]}</div></div>', unsafe_allow_html=True)
+                        f'<div class="result-content">{html.escape(r["reader"])}</div></div>', unsafe_allow_html=True)
 
     # Final report
     if "writer" in r:
